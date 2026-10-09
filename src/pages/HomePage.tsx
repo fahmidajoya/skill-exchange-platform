@@ -1,5 +1,13 @@
+import HeroSection from '../components/HeroSection'
+import StatsBar from '../components/StatsBar'
+
 function HomePage() {
-  return <div className="p-8 text-3xl font-bold">Home Page</div>
+  return (
+    <>
+      <HeroSection />
+      <StatsBar />
+    </>
+  )
 }
 
 export default HomePage
