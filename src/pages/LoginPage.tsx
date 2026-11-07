@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import InputField from '../components/InputField'
+import { useAuth } from '../AuthContext'
 
 type Mode = 'login' | 'signup'
 
@@ -22,11 +24,36 @@ const emptyForm: AuthFormData = {
   confirmPassword: '',
 }
 
+const getErrorMessage = (error: unknown) => {
+  const code = (error as { code?: string }).code
+
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists.'
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return 'Incorrect email or password.'
+    case 'auth/weak-password':
+      return 'Password is too weak. Use at least 6 characters.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please try again later.'
+    case 'auth/network-request-failed':
+      return 'Network error. Check your internet connection.'
+    default:
+      return 'Something went wrong. Please try again.'
+  }
+}
+
 function LoginPage() {
+  const { login, signup } = useAuth()
+  const navigate = useNavigate()
+
   const [mode, setMode] = useState<Mode>('login')
   const [form, setForm] = useState<AuthFormData>(emptyForm)
   const [errors, setErrors] = useState<FormErrors>({})
-  const [message, setMessage] = useState('')
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const updateField = (field: keyof AuthFormData, value: string) => {
     setForm({ ...form, [field]: value })
@@ -36,7 +63,7 @@ function LoginPage() {
     setMode(newMode)
     setForm(emptyForm)
     setErrors({})
-    setMessage('')
+    setFormError('')
   }
 
   const validate = (): FormErrors => {
@@ -65,19 +92,32 @@ function LoginPage() {
     return newErrors
   }
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const newErrors = validate()
     setErrors(newErrors)
+    setFormError('')
 
-    if (Object.keys(newErrors).length === 0) {
-      setMessage(
-        mode === 'login'
-          ? 'Login successful (demo). Real login will be added with Firebase.'
-          : 'Account created (demo). Real signup will be added with Firebase.'
-      )
-    } else {
-      setMessage('')
+    if (Object.keys(newErrors).length > 0) return
+
+    setSubmitting(true)
+    try {
+      if (mode === 'login') {
+        await login(form.email.trim(), form.password)
+      } else {
+        await signup({
+          fullName: form.fullName.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          role: form.role,
+        })
+      }
+      navigate('/')
+    } catch (error) {
+      console.error(error)
+      setFormError(getErrorMessage(error))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -161,15 +201,16 @@ function LoginPage() {
             />
           )}
 
-          {message && (
-            <p className="p-3 rounded-lg bg-green-50 text-green-700 text-sm">{message}</p>
+          {formError && (
+            <p className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{formError}</p>
           )}
 
           <button
             type="submit"
-            className="w-full bg-blue-900 text-white font-semibold py-3 rounded-xl hover:bg-blue-800"
+            disabled={submitting}
+            className="w-full bg-blue-900 text-white font-semibold py-3 rounded-xl hover:bg-blue-800 disabled:opacity-60"
           >
-            {mode === 'login' ? 'Log In' : 'Sign Up'}
+            {submitting ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Sign Up'}
           </button>
         </form>
       </div>
