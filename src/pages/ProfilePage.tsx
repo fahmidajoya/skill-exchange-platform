@@ -1,16 +1,11 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import InputField from '../components/InputField'
+import { useAuth } from '../AuthContext'
+import type { EditableProfile } from '../AuthContext'
 
-type Profile = {
-  fullName: string
-  email: string
-  role: string
-  department: string
-  bio: string
-}
-
-type ProfileErrors = Partial<Record<keyof Profile, string>>
+type ProfileErrors = Partial<Record<keyof EditableProfile, string>>
 
 type MyListing = {
   id: number
@@ -19,48 +14,85 @@ type MyListing = {
   price: string
 }
 
-const initialProfile: Profile = {
-  fullName: 'Amara Diallo',
-  email: 'amara@university.edu',
-  role: 'Student',
-  department: 'Computer Science',
-  bio: 'Third year CS student. I enjoy teaching programming and helping classmates with their projects.',
-}
-
-const initialListings: MyListing[] = [
+const sampleListings: MyListing[] = [
   { id: 1, title: 'Python Tutoring', category: 'Academic & Tech', price: 'From ₵35' },
   { id: 2, title: 'Data Analysis with Excel', category: 'Academic & Tech', price: 'From ₵30' },
   { id: 3, title: 'Presentation Slide Design', category: 'Creative & Craft', price: 'From ₵40' },
 ]
 
 function ProfilePage() {
-  const [profile, setProfile] = useState<Profile>(initialProfile)
-  const [draft, setDraft] = useState<Profile>(initialProfile)
+  const { user, profile, loading, saveProfile } = useAuth()
+
+  const [draft, setDraft] = useState<EditableProfile>({
+    fullName: '',
+    role: 'Student',
+    department: '',
+    bio: '',
+  })
   const [isEditing, setIsEditing] = useState(false)
   const [errors, setErrors] = useState<ProfileErrors>({})
   const [message, setMessage] = useState('')
-  const [listings, setListings] = useState<MyListing[]>(initialListings)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [listings, setListings] = useState<MyListing[]>(sampleListings)
+
+  if (loading) {
+    return <p className="p-12 text-center text-gray-600">Loading...</p>
+  }
+
+  if (!user) {
+    return (
+      <div className="bg-gray-50 px-8 py-16">
+        <div className="max-w-md mx-auto bg-white p-8 rounded-2xl border border-gray-200 text-center">
+          <h1 className="font-serif text-2xl font-bold text-blue-950">Please log in</h1>
+          <p className="mt-2 text-gray-600">You need to log in to see your profile.</p>
+          <Link
+            to="/login"
+            className="inline-block mt-6 bg-blue-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-800"
+          >
+            Log In
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <p className="p-12 text-center text-gray-600">
+        Profile data could not be loaded. Please try logging in again.
+      </p>
+    )
+  }
 
   const initials = profile.fullName
     .split(' ')
+    .filter(Boolean)
     .map((word) => word[0])
     .join('')
     .slice(0, 2)
     .toUpperCase()
 
-  const updateDraft = (field: keyof Profile, value: string) => {
+  const updateDraft = (field: keyof EditableProfile, value: string) => {
     setDraft({ ...draft, [field]: value })
   }
 
   const startEditing = () => {
-    setDraft(profile)
+    setDraft({
+      fullName: profile.fullName,
+      role: profile.role,
+      department: profile.department,
+      bio: profile.bio,
+    })
     setErrors({})
     setMessage('')
+    setSaveError('')
     setIsEditing(true)
   }
 
   const cancelEditing = () => {
     setErrors({})
+    setSaveError('')
     setIsEditing(false)
   }
 
@@ -71,16 +103,6 @@ function ProfilePage() {
       newErrors.fullName = 'Full name is required'
     }
 
-    if (draft.email.trim() === '') {
-      newErrors.email = 'Email is required'
-    } else if (!/^\S+@\S+\.\S+$/.test(draft.email)) {
-      newErrors.email = 'Enter a valid email address'
-    }
-
-    if (draft.department.trim() === '') {
-      newErrors.department = 'Department is required'
-    }
-
     if (draft.bio.length > 200) {
       newErrors.bio = 'Bio must be 200 characters or less'
     }
@@ -88,15 +110,29 @@ function ProfilePage() {
     return newErrors
   }
 
-  const handleSave = (e: FormEvent<HTMLFormElement>) => {
+  const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const newErrors = validate()
     setErrors(newErrors)
+    setSaveError('')
 
-    if (Object.keys(newErrors).length === 0) {
-      setProfile(draft)
+    if (Object.keys(newErrors).length > 0) return
+
+    setSaving(true)
+    try {
+      await saveProfile({
+        fullName: draft.fullName.trim(),
+        role: draft.role,
+        department: draft.department.trim(),
+        bio: draft.bio.trim(),
+      })
       setIsEditing(false)
-      setMessage('Profile updated (demo). It will be saved to the database with Firebase later.')
+      setMessage('Profile saved to the database.')
+    } catch (error) {
+      console.error(error)
+      setSaveError('Could not save your profile. Please try again.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -124,10 +160,14 @@ function ProfilePage() {
                   <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-900 font-semibold">
                     {profile.role}
                   </span>
-                  <span className="text-gray-600">{profile.department}</span>
+                  <span className="text-gray-600">
+                    {profile.department || 'Department not set'}
+                  </span>
                 </div>
                 <p className="mt-1 text-gray-500">{profile.email}</p>
-                <p className="mt-4 text-gray-700">{profile.bio}</p>
+                <p className="mt-4 text-gray-700">
+                  {profile.bio || 'No bio yet. Click Edit Profile to add one.'}
+                </p>
               </div>
 
               <button
@@ -148,13 +188,10 @@ function ProfilePage() {
                 error={errors.fullName}
               />
 
-              <InputField
-                label="Email"
-                type="email"
-                value={draft.email}
-                onChange={(value) => updateDraft('email', value)}
-                error={errors.email}
-              />
+              <div>
+                <label className="block mb-1 text-sm font-medium text-gray-700">Email</label>
+                <p className="px-4 py-3 rounded-xl bg-gray-100 text-gray-500">{profile.email}</p>
+              </div>
 
               <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">I am a</label>
@@ -172,7 +209,7 @@ function ProfilePage() {
                 label="Department"
                 value={draft.department}
                 onChange={(value) => updateDraft('department', value)}
-                error={errors.department}
+                placeholder="For example: Computer Science"
               />
 
               <div>
@@ -191,12 +228,17 @@ function ProfilePage() {
                 </div>
               </div>
 
+              {saveError && (
+                <p className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{saveError}</p>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="bg-blue-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-800"
+                  disabled={saving}
+                  className="bg-blue-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-800 disabled:opacity-60"
                 >
-                  Save Changes
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   type="button"
@@ -216,16 +258,19 @@ function ProfilePage() {
             <p className="mt-1 text-sm text-gray-500">Active Listings</p>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-gray-200">
-            <p className="font-serif text-3xl font-bold text-blue-950">24</p>
+            <p className="font-serif text-3xl font-bold text-blue-950">0</p>
             <p className="mt-1 text-sm text-gray-500">Completed Projects</p>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-gray-200">
-            <p className="font-serif text-3xl font-bold text-blue-950">★ 4.9</p>
+            <p className="font-serif text-3xl font-bold text-blue-950">—</p>
             <p className="mt-1 text-sm text-gray-500">Average Rating</p>
           </div>
         </div>
 
         <h2 className="mt-12 font-serif text-3xl font-bold text-blue-950">My Listings</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Sample listings (demo data). Real listings will be added later.
+        </p>
 
         {listings.length > 0 ? (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">

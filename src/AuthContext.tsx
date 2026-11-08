@@ -7,7 +7,7 @@ import {
   signOut,
 } from 'firebase/auth'
 import type { User } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 
 export type UserProfile = {
@@ -18,6 +18,8 @@ export type UserProfile = {
   bio: string
   isAdmin: boolean
 }
+
+export type EditableProfile = Pick<UserProfile, 'fullName' | 'role' | 'department' | 'bio'>
 
 type SignupData = {
   fullName: string
@@ -33,6 +35,7 @@ type AuthContextType = {
   signup: (data: SignupData) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  saveProfile: (data: EditableProfile) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -87,8 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth)
   }
 
+  const saveProfile = async (data: EditableProfile) => {
+    if (!user) return
+    await updateDoc(doc(db, 'users', user.uid), data)
+    setProfile((prev) => (prev ? { ...prev, ...data } : prev))
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signup, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signup, login, logout, saveProfile }}
+    >
       {children}
     </AuthContext.Provider>
   )
