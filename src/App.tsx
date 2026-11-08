@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './AuthContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import AdminRoute from './components/AdminRoute'
 import HomePage from './pages/HomePage'
 import BrowsePage from './pages/BrowsePage'
 import ProfilePage from './pages/ProfilePage'
@@ -19,7 +20,14 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/browse" element={<BrowsePage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/admin" element={<AdminPage />} />
+              <Route
+                path="/admin"
+                element={
+                  <AdminRoute>
+                    <AdminPage />
+                  </AdminRoute>
+                }
+              />
               <Route path="/login" element={<LoginPage />} />
             </Routes>
           </main>
