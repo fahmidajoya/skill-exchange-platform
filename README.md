@@ -2,7 +2,7 @@
 
 A web-based platform for a university campus where students and faculty can offer their skills (video editing, UI design, tutoring and more) and find skilled peers to hire.
 
-- Design prototype (Figma): https://www.figma.com/make/qemIHC3TOGonpotXU0elYw/Skill-Exchange-Platform-Design
+
 - Prototype code: https://github.com/fahmidajoya/skill_exchange_platform-prototype
 
 ## Features
