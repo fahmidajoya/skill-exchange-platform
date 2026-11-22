@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { services, categories } from '../data/services'
 import ServiceCard from '../components/ServiceCard'
 
 function BrowsePage() {
-  const [searchText, setSearchText] = useState('')
+  const [searchParams] = useSearchParams()
+  const [searchText, setSearchText] = useState(searchParams.get('search') ?? '')
   const [selectedCategory, setSelectedCategory] = useState('All')
 
   const filteredServices = services.filter((service) => {
