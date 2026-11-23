@@ -10,6 +10,13 @@ import type { User } from 'firebase/auth'
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 
+export type Skill = {
+  id: string
+  title: string
+  category: string
+  price: string
+}
+
 export type UserProfile = {
   fullName: string
   email: string
@@ -17,6 +24,7 @@ export type UserProfile = {
   department: string
   bio: string
   isAdmin: boolean
+  skills?: Skill[]
 }
 
 export type EditableProfile = Pick<UserProfile, 'fullName' | 'role' | 'department' | 'bio'>
@@ -36,6 +44,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   saveProfile: (data: EditableProfile) => Promise<void>
+  saveSkills: (skills: Skill[]) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -77,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       department: '',
       bio: '',
       isAdmin: false,
+      skills: [],
     }
     await setDoc(doc(db, 'users', credential.user.uid), newProfile)
     setProfile(newProfile)
@@ -96,9 +106,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile((prev) => (prev ? { ...prev, ...data } : prev))
   }
 
+  const saveSkills = async (skills: Skill[]) => {
+    if (!user) return
+    await updateDoc(doc(db, 'users', user.uid), { skills })
+    setProfile((prev) => (prev ? { ...prev, skills } : prev))
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, signup, login, logout, saveProfile }}
+      value={{ user, profile, loading, signup, login, logout, saveProfile, saveSkills }}
     >
       {children}
     </AuthContext.Provider>

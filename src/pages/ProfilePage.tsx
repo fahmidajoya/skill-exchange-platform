@@ -4,24 +4,14 @@ import { Link } from 'react-router-dom'
 import InputField from '../components/InputField'
 import { useAuth } from '../AuthContext'
 import type { EditableProfile } from '../AuthContext'
+import { categories } from '../data/services'
 
 type ProfileErrors = Partial<Record<keyof EditableProfile, string>>
 
-type MyListing = {
-  id: number
-  title: string
-  category: string
-  price: string
-}
-
-const sampleListings: MyListing[] = [
-  { id: 1, title: 'Python Tutoring', category: 'Academic & Tech', price: 'From ₵35' },
-  { id: 2, title: 'Data Analysis with Excel', category: 'Academic & Tech', price: 'From ₵30' },
-  { id: 3, title: 'Presentation Slide Design', category: 'Creative & Craft', price: 'From ₵40' },
-]
+const skillCategories = categories.filter((category) => category !== 'All')
 
 function ProfilePage() {
-  const { user, profile, loading, saveProfile } = useAuth()
+  const { user, profile, loading, saveProfile, saveSkills } = useAuth()
 
   const [draft, setDraft] = useState<EditableProfile>({
     fullName: '',
@@ -34,7 +24,12 @@ function ProfilePage() {
   const [message, setMessage] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [listings, setListings] = useState<MyListing[]>(sampleListings)
+
+  const [skillTitle, setSkillTitle] = useState('')
+  const [skillCategory, setSkillCategory] = useState(skillCategories[0])
+  const [skillPrice, setSkillPrice] = useState('')
+  const [skillError, setSkillError] = useState('')
+  const [skillSaving, setSkillSaving] = useState(false)
 
   if (loading) {
     return <p className="p-12 text-center text-gray-600">Loading...</p>
@@ -64,6 +59,8 @@ function ProfilePage() {
       </p>
     )
   }
+
+  const skills = profile.skills ?? []
 
   const initials = profile.fullName
     .split(' ')
@@ -136,8 +133,57 @@ function ProfilePage() {
     }
   }
 
-  const removeListing = (id: number) => {
-    setListings(listings.filter((listing) => listing.id !== id))
+  const handleAddSkill = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const title = skillTitle.trim()
+
+    if (title === '') {
+      setSkillError('Skill name is required')
+      return
+    }
+    if (title.length > 60) {
+      setSkillError('Skill name must be 60 characters or less')
+      return
+    }
+    if (skills.length >= 20) {
+      setSkillError('You can add up to 20 skills')
+      return
+    }
+    if (skills.some((skill) => skill.title.toLowerCase() === title.toLowerCase())) {
+      setSkillError('You already added this skill')
+      return
+    }
+
+    setSkillError('')
+    setSkillSaving(true)
+    try {
+      await saveSkills([
+        ...skills,
+        {
+          id: String(Date.now()),
+          title,
+          category: skillCategory,
+          price: skillPrice.trim(),
+        },
+      ])
+      setSkillTitle('')
+      setSkillPrice('')
+    } catch (error) {
+      console.error(error)
+      setSkillError('Could not save the skill. Please try again.')
+    } finally {
+      setSkillSaving(false)
+    }
+  }
+
+  const removeSkill = async (id: string) => {
+    setSkillError('')
+    try {
+      await saveSkills(skills.filter((skill) => skill.id !== id))
+    } catch (error) {
+      console.error(error)
+      setSkillError('Could not remove the skill. Please try again.')
+    }
   }
 
   return (
@@ -254,8 +300,8 @@ function ProfilePage() {
 
         <div className="mt-6 grid grid-cols-3 gap-4 text-center">
           <div className="bg-white p-6 rounded-2xl border border-gray-200">
-            <p className="font-serif text-3xl font-bold text-blue-950">{listings.length}</p>
-            <p className="mt-1 text-sm text-gray-500">Active Listings</p>
+            <p className="font-serif text-3xl font-bold text-blue-950">{skills.length}</p>
+            <p className="mt-1 text-sm text-gray-500">Skills Offered</p>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-gray-200">
             <p className="font-serif text-3xl font-bold text-blue-950">0</p>
@@ -267,22 +313,69 @@ function ProfilePage() {
           </div>
         </div>
 
-        <h2 className="mt-12 font-serif text-3xl font-bold text-blue-950">My Listings</h2>
+        <h2 className="mt-12 font-serif text-3xl font-bold text-blue-950">My Skills</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Sample listings (demo data). Real listings will be added later.
+          Add the skills you can offer to others on campus.
         </p>
 
-        {listings.length > 0 ? (
+        <form
+          onSubmit={handleAddSkill}
+          noValidate
+          className="mt-6 bg-white p-6 rounded-2xl border border-gray-200"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <InputField
+              label="Skill name"
+              value={skillTitle}
+              onChange={setSkillTitle}
+              placeholder="For example: Python Tutoring"
+            />
+
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-700">Category</label>
+              <select
+                value={skillCategory}
+                onChange={(e) => setSkillCategory(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none focus:border-blue-900 bg-white"
+              >
+                {skillCategories.map((category) => (
+                  <option key={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+
+            <InputField
+              label="Price (optional)"
+              value={skillPrice}
+              onChange={setSkillPrice}
+              placeholder="For example: From ₵35"
+            />
+          </div>
+
+          {skillError && (
+            <p className="mt-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{skillError}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={skillSaving}
+            className="mt-4 bg-blue-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-800 disabled:opacity-60"
+          >
+            {skillSaving ? 'Saving...' : 'Add Skill'}
+          </button>
+        </form>
+
+        {skills.length > 0 ? (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-            {listings.map((listing) => (
-              <div key={listing.id} className="bg-white p-6 rounded-2xl border border-gray-200">
+            {skills.map((skill) => (
+              <div key={skill.id} className="bg-white p-6 rounded-2xl border border-gray-200">
                 <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-900 text-xs font-semibold">
-                  {listing.category}
+                  {skill.category}
                 </span>
-                <h3 className="mt-4 text-xl font-semibold text-gray-900">{listing.title}</h3>
-                <p className="mt-2 font-semibold text-blue-950">{listing.price}</p>
+                <h3 className="mt-4 text-xl font-semibold text-gray-900">{skill.title}</h3>
+                {skill.price && <p className="mt-2 font-semibold text-blue-950">{skill.price}</p>}
                 <button
-                  onClick={() => removeListing(listing.id)}
+                  onClick={() => removeSkill(skill.id)}
                   className="mt-4 text-sm font-medium text-red-600 hover:underline"
                 >
                   Remove
@@ -292,7 +385,7 @@ function ProfilePage() {
           </div>
         ) : (
           <div className="mt-6 p-10 bg-white rounded-2xl border border-gray-200 text-center text-gray-600">
-            You have no listings yet.
+            You have not added any skills yet.
           </div>
         )}
       </div>
